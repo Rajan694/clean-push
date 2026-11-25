@@ -217,5 +217,13 @@ suite('Clean Push', () => {
 			await vscode.commands.executeCommand('cleanPush.refresh');
 			assert.deepStrictEqual(await waitFor(() => leftoverDiagnostics(env), (d) => d.length === 0), []);
 		});
+
+		test('installs and uninstalls the pre-push hook', async () => {
+			const hook = path.join(dir, '.git', 'hooks', 'pre-push');
+			await vscode.commands.executeCommand('cleanPush.installHook', dir);
+			assert.match(fs.readFileSync(hook, 'utf8'), /^#!\/bin\/sh\n# clean-push v1 /);
+			await vscode.commands.executeCommand('cleanPush.uninstallHook', dir);
+			assert.strictEqual(fs.existsSync(hook), false);
+		});
 	});
 });

@@ -25,6 +25,7 @@ Write new entries under **[Unreleased]**. The publish script moves them under th
 - Rule `large-file` (warning): an added file bigger than `cleanPush.largeFileKB`, binary files included.
 - **Add to .gitignore** quick fix and Leftovers-row menu item for `env-file` and `large-file`; if git already tracks the file it offers to stop tracking it (`git rm --cached`).
 - `cleanPush.customRules`: your own regex rules, with languages, severity and message.
+- **Clean Push: Install Git Pre-push Hook** / **Uninstall Git Pre-push Hook**: an optional POSIX `sh` hook that blocks a push whose new commits add conflict markers, `.only(`, a bare `debugger`, a private key or an AWS access key, naming the file and line. It never overwrites another hook; with `core.hooksPath` set (Husky, lefthook) it shows the lines to add to your own hook instead.
 
 ## [0.1.0] - 2026-11-25
 

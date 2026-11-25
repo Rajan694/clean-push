@@ -2,15 +2,11 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { SECTION } from './config';
 import { gitRunner, type Scope } from './git/changedFiles';
+import { hookSnippet, hookState, writeHook } from './hook/hookFile';
+import * as fs from 'fs';
 import type { LeftoverStore } from './store';
 import { fixAllEdit } from './codeActions';
 import { plural } from './summary';
-
-/** Commands whose features arrive in later milestones (see docs/DESIGN.md, "Milestones"). */
-const PLANNED: Record<string, string> = {
-	'cleanPush.installHook': 'v1.0',
-	'cleanPush.uninstallHook': 'v1.0',
-};
 
 const SCOPE_ITEMS: readonly { scope: Scope; label: string; detail: string }[] = [
 	{ scope: 'unpushed', label: 'Unpushed', detail: 'Commits not pushed yet, plus staged and unstaged changes.' },
@@ -23,12 +19,14 @@ export interface CommandDeps {
 	refresh: () => Promise<void>;
 	/** Path of the git executable, once the Git extension is ready. */
 	gitPath: () => string | undefined;
+	/** Roots of the repositories being checked. */
+	repositories: () => string[];
 }
 
 /** A file a command is for: a view row, a URI, or (when undefined) the active editor's file. */
 type Target = { uri: vscode.Uri } | { leftover: { uri: vscode.Uri } } | vscode.Uri | undefined;
 
-export function registerCommands({ store, refresh, gitPath }: CommandDeps): vscode.Disposable {
+export function registerCommands({ store, refresh, gitPath, repositories }: CommandDeps): vscode.Disposable {
 	const disposables = [
 		vscode.commands.registerCommand('cleanPush.refresh', () =>
 			vscode.window.withProgress({ location: { viewId: 'workbench.scm' } }, refresh),
@@ -37,14 +35,9 @@ export function registerCommands({ store, refresh, gitPath }: CommandDeps): vsco
 		vscode.commands.registerCommand('cleanPush.openFirstLeftover', (target?: Target) => openFirstLeftover(store, target)),
 		vscode.commands.registerCommand('cleanPush.fixAllInFile', (target?: Target) => fixAllInFile(store, target)),
 		vscode.commands.registerCommand('cleanPush.addToGitignore', (target?: Target) => addToGitignore(store, gitPath(), target)),
+		vscode.commands.registerCommand('cleanPush.installHook', (root?: string) => installHook(gitPath(), root ?? repositories())),
+		vscode.commands.registerCommand('cleanPush.uninstallHook', (root?: string) => uninstallHook(gitPath(), root ?? repositories())),
 	];
-	for (const [id, milestone] of Object.entries(PLANNED)) {
-		disposables.push(
-			vscode.commands.registerCommand(id, () => {
-				void vscode.window.showInformationMessage(`Clean Push: this command arrives in ${milestone}.`);
-			}),
-		);
-	}
 	return vscode.Disposable.from(...disposables);
 }
 
@@ -183,4 +176,104 @@ async function changeScope(): Promise<void> {
 	const target =
 		inspected?.workspaceValue !== undefined ? vscode.ConfigurationTarget.Workspace : vscode.ConfigurationTarget.Global;
 	await config.update('scope', picked.scope, target);
+}
+
+/** The repository a hook command is for: the given root, the only one, or the user's pick. */
+async function pickRepository(roots: string | string[], action: string): Promise<string | undefined> {
+	if (typeof roots === 'string') {
+		return roots;
+	}
+	if (roots.length === 0) {
+		void vscode.window.showWarningMessage('Clean Push: no Git repository is open.');
+		return undefined;
+	}
+	if (roots.length === 1) {
+		return roots[0];
+	}
+	const picked = await vscode.window.showQuickPick(
+		roots.map((root) => ({ label: path.basename(root), description: root, root })),
+		{ title: `Clean Push: ${action}`, placeHolder: 'Pick a repository' },
+	);
+	return picked?.root;
+}
+
+async function showSnippet(): Promise<void> {
+	const doc = await vscode.workspace.openTextDocument({ language: 'shellscript', content: hookSnippet() });
+	await vscode.window.showTextDocument(doc);
+}
+
+/**
+ * Writes the pre-push hook, on request only. Never overwrites a hook Clean Push didn't write,
+ * and writes nothing when core.hooksPath is set (Husky, lefthook...): it shows the lines to
+ * add to that hook instead.
+ */
+async function installHook(git: string | undefined, roots: string | string[]): Promise<void> {
+	const root = await pickRepository(roots, 'Install Git Pre-push Hook');
+	if (!root) {
+		return;
+	}
+	if (!git) {
+		void vscode.window.showWarningMessage('Clean Push: Git is not ready yet; try again in a moment.');
+		return;
+	}
+	const state = await hookState(gitRunner(git, root), root);
+	const name = path.basename(root);
+	switch (state.kind) {
+		case 'hooksPath': {
+			void vscode.window.showInformationMessage(
+				`Clean Push: ${name} keeps its hooks in ${state.hooksPath} (core.hooksPath, set by tools such as Husky or lefthook), ` +
+					'so no hook was written. Add the lines in the new editor to your pre-push hook there.',
+			);
+			await showSnippet();
+			return;
+		}
+		case 'foreign': {
+			const show = 'Show Lines';
+			const choice = await vscode.window.showWarningMessage(
+				`Clean Push: ${name} already has a pre-push hook that Clean Push didn't write, so it was left alone. Show the lines to add to it?`,
+				show,
+			);
+			if (choice === show) {
+				await showSnippet();
+			}
+			return;
+		}
+		case 'ours':
+		case 'none':
+			await writeHook(state.file);
+			void vscode.window.showInformationMessage(
+				`Clean Push: ${state.kind === 'ours' ? 'updated' : 'installed'} the pre-push hook in ${name}. ` +
+					'It blocks pushes that add conflict markers, .only, debugger or private keys; skip it once with git push --no-verify.',
+			);
+	}
+}
+
+/** Removes the pre-push hook, but only one Clean Push wrote. */
+async function uninstallHook(git: string | undefined, roots: string | string[]): Promise<void> {
+	const root = await pickRepository(roots, 'Uninstall Git Pre-push Hook');
+	if (!root) {
+		return;
+	}
+	if (!git) {
+		void vscode.window.showWarningMessage('Clean Push: Git is not ready yet; try again in a moment.');
+		return;
+	}
+	const state = await hookState(gitRunner(git, root), root);
+	const name = path.basename(root);
+	switch (state.kind) {
+		case 'hooksPath':
+			void vscode.window.showInformationMessage(
+				`Clean Push: ${name} keeps its hooks in ${state.hooksPath}; remove the clean-push lines from the pre-push hook there.`,
+			);
+			return;
+		case 'foreign':
+			void vscode.window.showInformationMessage(`Clean Push: the pre-push hook in ${name} wasn't written by Clean Push; left it alone.`);
+			return;
+		case 'none':
+			void vscode.window.showInformationMessage(`Clean Push: ${name} has no pre-push hook.`);
+			return;
+		case 'ours':
+			await fs.promises.unlink(state.file);
+			void vscode.window.showInformationMessage(`Clean Push: removed the pre-push hook from ${name}.`);
+	}
 }

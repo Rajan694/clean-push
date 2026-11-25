@@ -47,6 +47,7 @@ export function activate(context: vscode.ExtensionContext): TestApi {
 				await checker?.refresh();
 			},
 			gitPath: () => gitPath,
+			repositories: () => checker?.roots() ?? [],
 		}),
 		{ dispose: () => checker?.dispose() },
 	);

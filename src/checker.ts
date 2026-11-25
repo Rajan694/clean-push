@@ -68,6 +68,11 @@ export class Checker implements vscode.Disposable {
 		}
 	}
 
+	/** Roots of the repositories being checked. */
+	roots(): string[] {
+		return [...this.repos.keys()];
+	}
+
 	/** Checks every repository again, without reusing cached results. */
 	refresh(): Promise<void> {
 		const runs: Promise<void>[] = [];
