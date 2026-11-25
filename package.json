@@ -1,0 +1,364 @@
+{
+  "name": "clean-push",
+  "displayName": "Clean Push: catch leftovers before you push",
+  "description": "Finds debug leftovers in the lines you changed (console.log, debugger, .only in tests, new TODOs, secrets, merge-conflict markers) and shows them in Source Control before you push.",
+  "icon": "assets/icon.png",
+  "publisher": "rajan694",
+  "version": "0.0.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Rajan694/clean-push.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Rajan694/clean-push/issues"
+  },
+  "homepage": "https://github.com/Rajan694/clean-push#readme",
+  "engines": {
+    "vscode": "^1.102.0"
+  },
+  "categories": [
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "console.log",
+    "debugger",
+    "leftovers",
+    "pre-push",
+    "secrets",
+    "git"
+  ],
+  "extensionDependencies": [
+    "vscode.git"
+  ],
+  "activationEvents": [
+    "workspaceContains:.git"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "views": {
+      "scm": [
+        {
+          "id": "cleanPush.leftovers",
+          "name": "Leftovers",
+          "icon": "assets/view-icon.svg",
+          "when": "cleanPush.hasLeftovers"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "cleanPush.openFirstLeftover",
+        "title": "Go to First Leftover",
+        "category": "Clean Push",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "cleanPush.fixAllInFile",
+        "title": "Fix All Leftovers in File",
+        "category": "Clean Push",
+        "icon": "$(wand)"
+      },
+      {
+        "command": "cleanPush.refresh",
+        "title": "Refresh",
+        "category": "Clean Push",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "cleanPush.changeScope",
+        "title": "Change Scope",
+        "category": "Clean Push",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "cleanPush.installHook",
+        "title": "Install Git Pre-push Hook",
+        "category": "Clean Push"
+      },
+      {
+        "command": "cleanPush.uninstallHook",
+        "title": "Uninstall Git Pre-push Hook",
+        "category": "Clean Push"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "cleanPush.openFirstLeftover",
+          "when": "false"
+        },
+        {
+          "command": "cleanPush.fixAllInFile",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "cleanPush.refresh",
+          "when": "view == cleanPush.leftovers",
+          "group": "navigation"
+        },
+        {
+          "command": "cleanPush.changeScope",
+          "when": "view == cleanPush.leftovers",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "cleanPush.openFirstLeftover",
+          "when": "view == cleanPush.leftovers && viewItem == leftoverFile",
+          "group": "inline"
+        },
+        {
+          "command": "cleanPush.fixAllInFile",
+          "when": "view == cleanPush.leftovers && viewItem == leftoverFile",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Clean Push",
+      "properties": {
+        "cleanPush.scope": {
+          "type": "string",
+          "default": "unpushed",
+          "enum": [
+            "unpushed",
+            "uncommitted",
+            "staged"
+          ],
+          "enumDescriptions": [
+            "Commits not pushed yet, plus staged and unstaged changes.",
+            "Staged and unstaged changes.",
+            "Staged changes only."
+          ],
+          "description": "Which added lines are checked for leftovers."
+        },
+        "cleanPush.rules": {
+          "type": "object",
+          "description": "Severity of each built-in rule. Use \"off\" to turn a rule off.",
+          "default": {
+            "conflict-marker": "error",
+            "secret": "error",
+            "env-file": "error",
+            "focused-test": "error",
+            "debugger": "warning",
+            "console": "warning",
+            "print": "warning",
+            "large-file": "warning",
+            "todo": "info"
+          },
+          "properties": {
+            "conflict-marker": {
+              "type": "string",
+              "enum": [
+                "error",
+                "warning",
+                "info",
+                "off"
+              ],
+              "description": "Lines starting with <<<<<<<, ======= or >>>>>>>."
+            },
+            "secret": {
+              "type": "string",
+              "enum": [
+                "error",
+                "warning",
+                "info",
+                "off"
+              ],
+              "description": "AWS keys, GitHub tokens, private key headers, api_key = \"...\" assignments."
+            },
+            "env-file": {
+              "type": "string",
+              "enum": [
+                "error",
+                "warning",
+                "info",
+                "off"
+              ],
+              "description": "A changed .env file (not .env.example) that git does not ignore."
+            },
+            "focused-test": {
+              "type": "string",
+              "enum": [
+                "error",
+                "warning",
+                "info",
+                "off"
+              ],
+              "description": ".only(, fit(, fdescribe( in JS/TS test files."
+            },
+            "debugger": {
+              "type": "string",
+              "enum": [
+                "error",
+                "warning",
+                "info",
+                "off"
+              ],
+              "description": "debugger;, breakpoint(), pdb.set_trace(), import pdb, binding.pry."
+            },
+            "console": {
+              "type": "string",
+              "enum": [
+                "error",
+                "warning",
+                "info",
+                "off"
+              ],
+              "description": "console.log/debug/info/trace/warn/error, minus anything in cleanPush.ignoreList."
+            },
+            "print": {
+              "type": "string",
+              "enum": [
+                "error",
+                "warning",
+                "info",
+                "off"
+              ],
+              "description": "print( in Python, System.out.println, fmt.Println, dbg!, var_dump, dd(."
+            },
+            "large-file": {
+              "type": "string",
+              "enum": [
+                "error",
+                "warning",
+                "info",
+                "off"
+              ],
+              "description": "An added file bigger than cleanPush.largeFileKB."
+            },
+            "todo": {
+              "type": "string",
+              "enum": [
+                "error",
+                "warning",
+                "info",
+                "off"
+              ],
+              "description": "New TODO, FIXME, HACK and XXX comments."
+            }
+          },
+          "additionalProperties": false
+        },
+        "cleanPush.ignoreList": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "console.warn",
+            "console.error"
+          ],
+          "markdownDescription": "Calls or text that never count as leftovers. Plain text such as `logger.debug`, or a regex written as `/…/`."
+        },
+        "cleanPush.customRules": {
+          "type": "array",
+          "default": [],
+          "description": "Extra rules, each a regex with the languages it applies to, a severity and a message.",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "pattern",
+              "message"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique rule id, e.g. \"no-localhost-url\"."
+              },
+              "pattern": {
+                "type": "string",
+                "description": "Regular expression matched against each added line."
+              },
+              "languages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "VS Code language ids. Leave out to apply to all languages."
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "error",
+                  "warning",
+                  "info"
+                ],
+                "default": "warning"
+              },
+              "message": {
+                "type": "string",
+                "description": "Message shown for each match."
+              }
+            }
+          }
+        },
+        "cleanPush.exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/dist/**",
+            "**/vendor/**",
+            "**/*.min.js",
+            "**/package-lock.json",
+            "**/yarn.lock",
+            "**/pnpm-lock.yaml",
+            "**/bun.lock",
+            "**/bun.lockb"
+          ],
+          "description": "Glob patterns of files that are never checked."
+        },
+        "cleanPush.largeFileKB": {
+          "type": "number",
+          "default": 1024,
+          "minimum": 1,
+          "description": "Size in KB for the large-file rule. Bigger files are not scanned."
+        },
+        "cleanPush.ignoreComment": {
+          "type": "string",
+          "default": "leftover-ignore",
+          "description": "A line ending in this marker is never flagged."
+        },
+        "cleanPush.decorateExplorer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Color files with leftovers and show a count badge in the Explorer and editor tabs."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.20.5",
+    "@types/vscode": "~1.102.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^4.1.1",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.15.0",
+    "ovsx": "^1.4.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.74.0"
+  }
+}

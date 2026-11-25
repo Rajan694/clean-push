@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Clean Push Marketplace icon (source for icon.png): a push arrow with a check: nothing left behind. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#10B981"/>
+      <stop offset="1" stop-color="#0E7490"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+  <path d="M103 182V70M61 100 103 58 145 100" fill="none" stroke="#fff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="171" cy="174" r="38" fill="#fff"/>
+  <path d="M153 175l13 13 24-26" fill="none" stroke="#0F766E" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
