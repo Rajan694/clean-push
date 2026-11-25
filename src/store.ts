@@ -22,15 +22,20 @@ export class LeftoverStore implements vscode.Disposable {
 		}
 	}
 
-	/** Every file with leftovers, across repositories. */
-	*files(): IterableIterator<[vscode.Uri, Leftover[]]> {
-		for (const files of this.byRepo.values()) {
+	/** Every file with leftovers, across repositories, with its repository root. */
+	*files(): IterableIterator<[uri: vscode.Uri, leftovers: Leftover[], root: string]> {
+		for (const [root, files] of this.byRepo) {
 			for (const leftovers of files.values()) {
 				if (leftovers.length > 0) {
-					yield [leftovers[0].uri, leftovers];
+					yield [leftovers[0].uri, leftovers, root];
 				}
 			}
 		}
+	}
+
+	/** How many repositories have results (with or without leftovers). */
+	get repositoryCount(): number {
+		return this.byRepo.size;
 	}
 
 	get(uri: vscode.Uri): Leftover[] {

@@ -35,7 +35,7 @@ export const debuggerRule: Rule = {
 			if (m) {
 				const lead = m[0].length - m[0].trimStart().length;
 				const start = m.index + lead;
-				return [{ start, end: m.index + m[0].trimEnd().length, message: `${label} left in code` }];
+				return [{ start, end: m.index + m[0].trimEnd().length, message: `${label} left in code`, label: label === 'debugger statement' ? 'debugger' : label }];
 			}
 		}
 		return [];

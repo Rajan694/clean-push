@@ -4,7 +4,7 @@
 
 **Catch debug leftovers before you push.** Clean Push checks only the lines you changed for `console.log`, `debugger`, `.only` in tests, new TODOs, secrets and merge-conflict markers, and lists them in a **Leftovers** section right under Git's Changes list in Source Control.
 
-> **Status: early development.** Milestone 0.1 works: leftovers in the lines you changed show up as warnings in the editor and the Problems panel. The Source Control section, quick fixes and the other rules arrive by milestone (see [Roadmap](#roadmap)). The full design is in [docs/DESIGN.md](docs/DESIGN.md).
+> **Status: early development.** Milestones 0.1 and 0.2 work: leftovers in the lines you changed show up as warnings in the editor and the Problems panel, in a Leftovers section under Git's Changes list, and in the status bar. Quick fixes and the other rules arrive by milestone (see [Roadmap](#roadmap)). The full design is in [docs/DESIGN.md](docs/DESIGN.md).
 
 ## Features
 
@@ -47,7 +47,7 @@
 | Version | Adds |
 | --- | --- |
 | 0.1 ✓ | Warnings in the editor: added-line detection, `console`, `debugger`, `focused-test`, `conflict-marker`, `todo` (also the `scope`, `ignoreList`, `exclude`, `largeFileKB` and `ignoreComment` settings) |
-| 0.2 | Leftovers section in Source Control, status bar item |
+| 0.2 ✓ | Leftovers section in Source Control, status bar item |
 | 0.3 | Quick fixes, Fix all, Explorer and tab badges, `leftover-ignore` |
 | 0.4 | `secret`, `env-file`, `large-file`, `print`, custom rules, scope setting |
 | 1.0 | Optional pre-push git hook, cross-platform tests, Marketplace listing |
@@ -70,10 +70,10 @@ npm run compile     # type-check, lint, bundle to dist/
 npm test            # extension tests in a downloaded VS Code
 ```
 
-The rule engine (`src/scanner.ts`, `src/lexer.ts`, `src/rules/`, `src/git/addedLines.ts`, `src/git/changedFiles.ts`) has no VS Code imports, so its tests also run in plain mocha, in well under a second:
+The rule engine (`src/scanner.ts`, `src/lexer.ts`, `src/rules/`, `src/summary.ts`, `src/git/addedLines.ts`, `src/git/changedFiles.ts`) has no VS Code imports, so its tests also run in plain mocha, in well under a second:
 
 ```bash
-npm run compile-tests && npx mocha --ui tdd out/test/rules.test.js out/test/addedLines.test.js out/test/changedFiles.test.js
+npm run compile-tests && npx mocha --ui tdd out/test/rules.test.js out/test/addedLines.test.js out/test/changedFiles.test.js out/test/summary.test.js
 ```
 
 Press `F5` in VS Code to open a window with the extension loaded. Packaging and publishing are described in [RELEASING.md](RELEASING.md).

@@ -33,6 +33,8 @@ export interface RuleMatch {
 	start: number;
 	end: number;
 	message: string;
+	/** Short name for lists and summaries, e.g. "console.log" or "new TODO". */
+	label: string;
 }
 
 export interface Rule {
@@ -62,6 +64,9 @@ export interface Finding {
 	ruleId: string;
 	severity: Severity;
 	message: string;
+	label: string;
+	/** The whole line, for showing the leftover in context. */
+	text: string;
 	fix?: FixKind;
 }
 
@@ -72,5 +77,8 @@ export interface Leftover {
 	ruleId: string;
 	severity: Severity;
 	message: string;
+	label: string;
+	/** The whole line, for showing the leftover in context. */
+	lineText: string;
 	fix?: FixKind;
 }

@@ -4,6 +4,9 @@ import { syntaxFor } from './languages';
 import { lexLines } from './lexer';
 import { hasIgnoreComment, type IgnoreMatcher } from './match';
 
+/** Longest line text kept with a finding; minified lines can be huge. */
+const MAX_TEXT = 500;
+
 export interface ScanOptions {
 	rules: readonly ActiveRule[];
 	ignore: IgnoreMatcher;
@@ -47,6 +50,8 @@ export function scanText(text: string, path: string, languageId: string, added: 
 					ruleId: rule.id,
 					severity: rule.severity,
 					message: m.message,
+					label: m.label,
+					text: textLine.length > MAX_TEXT ? textLine.slice(0, MAX_TEXT) : textLine,
 					fix: rule.fix,
 				});
 			}

@@ -12,6 +12,6 @@ export const conflictMarker: Rule = {
 		const text = line.text.replace(/\r$/, '');
 		const isMarker =
 			/^(<{7}|>{7}|\|{7})(?: |$)/.test(text) || (/^={7}\s*$/.test(text) && !PROSE.has(line.languageId));
-		return isMarker ? [{ start: 0, end: text.trimEnd().length, message: 'Merge conflict marker' }] : [];
+		return isMarker ? [{ start: 0, end: text.trimEnd().length, message: 'Merge conflict marker', label: 'conflict marker' }] : [];
 	},
 };

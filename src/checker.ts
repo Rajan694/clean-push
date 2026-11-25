@@ -246,6 +246,8 @@ function toLeftover(uri: vscode.Uri, f: Finding): Leftover {
 		ruleId: f.ruleId,
 		severity: f.severity,
 		message: f.message,
+		label: f.label,
+		lineText: f.text,
 		fix: f.fix,
 	};
 }

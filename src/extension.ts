@@ -4,10 +4,19 @@ import { registerCommands } from './commands';
 import { getGitApi } from './git/gitApi';
 import { LeftoverStore } from './store';
 import { registerDiagnostics } from './ui/diagnostics';
+import { LeftoversView } from './ui/leftoversView';
+import { registerStatusBar } from './ui/statusBar';
 
-export function activate(context: vscode.ExtensionContext): void {
+/** Returned from activate() for the extension's own tests; not a stable API for other extensions. */
+export interface TestApi {
+	store: LeftoverStore;
+	leftoversView: LeftoversView;
+}
+
+export function activate(context: vscode.ExtensionContext): TestApi {
 	const log = vscode.window.createOutputChannel('Clean Push', { log: true });
 	const store = new LeftoverStore();
+	const leftoversView = new LeftoversView(store);
 	let checker: Checker | undefined;
 	let ready: Promise<void> = Promise.resolve();
 
@@ -15,7 +24,9 @@ export function activate(context: vscode.ExtensionContext): void {
 		log,
 		store,
 		registerDiagnostics(store),
-		registerCommands(async () => {
+		leftoversView,
+		registerStatusBar(store),
+		registerCommands(store, async () => {
 			await ready;
 			await checker?.refresh();
 		}),
@@ -32,6 +43,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		},
 		(e) => log.error(`Could not get the Git extension's API: ${e instanceof Error ? e.message : e}`),
 	);
+	return { store, leftoversView };
 }
 
 export function deactivate(): void {}

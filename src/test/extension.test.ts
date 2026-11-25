@@ -4,7 +4,9 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import type { TestApi } from '../extension';
 import type { GitExtension } from '../git/git';
+import type { FileNode, LeftoverNode } from '../ui/leftoversView';
 
 const EXTENSION_ID = 'rajan694.clean-push';
 
@@ -43,6 +45,7 @@ suite('Clean Push', () => {
 	suite('in a git repository', function () {
 		this.timeout(60000);
 		let dir: string;
+		let api: TestApi;
 		const git = (...args: string[]) =>
 			execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', ...args], {
 				cwd: dir,
@@ -56,7 +59,7 @@ suite('Clean Push', () => {
 			git('add', '.');
 			git('commit', '-qm', 'init');
 
-			await vscode.extensions.getExtension(EXTENSION_ID)!.activate();
+			api = await vscode.extensions.getExtension<TestApi>(EXTENSION_ID)!.activate();
 			const gitExtension = await vscode.extensions.getExtension<GitExtension>('vscode.git')!.activate();
 			const repository = await gitExtension.getAPI(1).openRepository(vscode.Uri.file(dir));
 			assert.ok(repository, 'the Git extension opened the test repository');
@@ -107,6 +110,36 @@ suite('Clean Push', () => {
 					[1, 'debugger', vscode.DiagnosticSeverity.Warning],
 				],
 			);
+		});
+
+		// Uses the untracked test file from the previous test.
+		test('lists leftovers in the Leftovers view, and Jump opens the first one', async () => {
+			const view = api.leftoversView;
+			const files = view.getChildren() as FileNode[];
+			const file = files.find((f) => f.relativePath === 'src/feature.test.js');
+			assert.ok(file, `rows: ${files.map((f) => f.relativePath).join(', ')}`);
+			assert.strictEqual(view.treeView.description, '2 in 1 file');
+
+			const fileItem = view.getTreeItem(file);
+			assert.strictEqual(fileItem.label, 'feature.test.js');
+			assert.strictEqual(fileItem.description, '2 · src');
+			assert.strictEqual(fileItem.tooltip, 'feature.test.js — 2 leftovers: 1 focused test, 1 debugger\nsrc/feature.test.js');
+			assert.strictEqual(fileItem.contextValue, 'leftoverFile');
+
+			const rows = (view.getChildren(file) as LeftoverNode[]).map((node) => view.getTreeItem(node));
+			assert.deepStrictEqual(
+				rows.map((r) => [r.label, r.description]),
+				[
+					[{ label: '1  it.only("works", () => {', highlights: [[3, 10]] }, 'focused test'],
+					[{ label: '2  debugger;', highlights: [[3, 12]] }, 'debugger'],
+				],
+			);
+			assert.strictEqual(rows[1].command?.command, 'vscode.open');
+
+			await vscode.commands.executeCommand('cleanPush.openFirstLeftover', file);
+			const editor = vscode.window.activeTextEditor;
+			assert.strictEqual(editor?.document.uri.fsPath, file.uri.fsPath);
+			assert.ok(editor.selection.isEqual(new vscode.Selection(0, 0, 0, 7)), JSON.stringify(editor.selection));
 		});
 	});
 });

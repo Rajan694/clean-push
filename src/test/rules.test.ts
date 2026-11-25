@@ -62,6 +62,8 @@ suite('rules', () => {
 		].join('\n'));
 		assert.deepStrictEqual(ids(findings), ['0:console', '2:console']);
 		assert.deepStrictEqual(findings.map((f) => f.message), ['console.log left in code', 'console.debug left in code']);
+		assert.deepStrictEqual(findings.map((f) => f.label), ['console.log', 'console.debug']);
+		assert.strictEqual(findings[1].text, 'console.error(err); console.debug(x)');
 		// The squiggle covers the whole call, up to the semicolon.
 		assert.deepStrictEqual([findings[0].start, findings[0].end], [0, 24]);
 		assert.deepStrictEqual([findings[1].start, findings[1].end], [20, 36]);
@@ -90,7 +92,9 @@ suite('rules', () => {
 
 	test('debugger: Python and Ruby', () => {
 		const py = ['import pdb', 'pdb.set_trace()', 'breakpoint()', 'from ipdb import set_trace', 'x = "breakpoint()"', '# breakpoint()'];
-		assert.deepStrictEqual(ids(scan('a.py', py.join('\n'))), ['0:debugger', '1:debugger', '2:debugger', '3:debugger']);
+		const pyFindings = scan('a.py', py.join('\n'));
+		assert.deepStrictEqual(ids(pyFindings), ['0:debugger', '1:debugger', '2:debugger', '3:debugger']);
+		assert.deepStrictEqual(pyFindings.map((f) => f.label), ['import pdb', 'set_trace()', 'breakpoint()', 'import pdb']);
 		const rb = ['binding.pry', '  byebug', 'debugger', 'puts "binding.pry"'];
 		assert.deepStrictEqual(ids(scan('a.rb', rb.join('\n'))), ['0:debugger', '1:debugger', '2:debugger']);
 	});
@@ -131,6 +135,7 @@ suite('rules', () => {
 		const findings = scan('a.ts', text);
 		assert.deepStrictEqual(ids(findings), ['0:todo', '2:todo']);
 		assert.strictEqual(findings[0].message, 'New TODO comment');
+		assert.deepStrictEqual(findings.map((f) => f.label), ['new TODO', 'new FIXME']);
 		assert.deepStrictEqual([findings[1].start, findings[1].end], [3, 15]);
 		assert.deepStrictEqual(ids(scan('a.py', '# XXX hash comment')), ['0:todo']);
 		assert.deepStrictEqual(ids(scan('README.md', '- TODO list item\n<!-- TODO hidden -->')), ['1:todo']);

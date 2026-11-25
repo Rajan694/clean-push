@@ -109,12 +109,12 @@
       "view/item/context": [
         {
           "command": "cleanPush.openFirstLeftover",
-          "when": "view == cleanPush.leftovers && viewItem == leftoverFile",
+          "when": "view == cleanPush.leftovers && viewItem =~ /^leftoverFile/",
           "group": "inline"
         },
         {
           "command": "cleanPush.fixAllInFile",
-          "when": "view == cleanPush.leftovers && viewItem == leftoverFile",
+          "when": "view == cleanPush.leftovers && viewItem == leftoverFile.fixable",
           "group": "inline"
         }
       ]

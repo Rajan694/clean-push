@@ -16,6 +16,6 @@ export const todo: Rule = {
 		// Underline from the keyword to the end of its comment, without a closing */ or -->.
 		const close = CLOSERS.exec(line.comments.slice(m.index));
 		const text = line.comments.slice(m.index, close ? m.index + close.index : undefined).trimEnd();
-		return [{ start: m.index, end: m.index + text.length, message: `New ${m[1]} comment` }];
+		return [{ start: m.index, end: m.index + text.length, message: `New ${m[1]} comment`, label: `new ${m[1]}` }];
 	},
 };

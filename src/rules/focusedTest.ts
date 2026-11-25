@@ -19,6 +19,6 @@ export const focusedTest: Rule = {
 			return [];
 		}
 		const name = m[1].replace(/\s+/g, '');
-		return [{ start: m.index, end: m.index + m[1].length, message: `Focused test: ${name} skips every other test` }];
+		return [{ start: m.index, end: m.index + m[1].length, message: `Focused test: ${name} skips every other test`, label: 'focused test' }];
 	},
 };

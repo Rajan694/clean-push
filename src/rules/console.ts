@@ -18,6 +18,7 @@ export const consoleRule: Rule = {
 			start: m.index,
 			end: callEnd(line.code, m.index + m[0].length - 1),
 			message: `console.${m[1]} left in code`,
+			label: `console.${m[1]}`,
 		}));
 	},
 };
