@@ -1,0 +1,50 @@
+import * as vscode from 'vscode';
+import type { Leftover } from './model';
+
+/**
+ * The leftovers found in every repository, grouped by file. Each check replaces the results
+ * of one repository; views listen to onDidChange and redraw from here.
+ */
+export class LeftoverStore implements vscode.Disposable {
+	/** Repository root (fsPath) → file URI (string) → leftovers. */
+	private readonly byRepo = new Map<string, Map<string, Leftover[]>>();
+	private readonly changed = new vscode.EventEmitter<void>();
+	readonly onDidChange = this.changed.event;
+
+	setRepository(root: string, files: Map<string, Leftover[]>): void {
+		this.byRepo.set(root, files);
+		this.changed.fire();
+	}
+
+	clearRepository(root: string): void {
+		if (this.byRepo.delete(root)) {
+			this.changed.fire();
+		}
+	}
+
+	/** Every file with leftovers, across repositories. */
+	*files(): IterableIterator<[vscode.Uri, Leftover[]]> {
+		for (const files of this.byRepo.values()) {
+			for (const leftovers of files.values()) {
+				if (leftovers.length > 0) {
+					yield [leftovers[0].uri, leftovers];
+				}
+			}
+		}
+	}
+
+	get(uri: vscode.Uri): Leftover[] {
+		const key = uri.toString();
+		for (const files of this.byRepo.values()) {
+			const leftovers = files.get(key);
+			if (leftovers) {
+				return leftovers;
+			}
+		}
+		return [];
+	}
+
+	dispose(): void {
+		this.changed.dispose();
+	}
+}

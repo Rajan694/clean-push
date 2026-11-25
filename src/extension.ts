@@ -1,31 +1,37 @@
 import * as vscode from 'vscode';
-
-/**
- * Commands declared in package.json. Each one gets its real handler as its milestone
- * lands (see docs/DESIGN.md, "Milestones"); until then it shows a short notice, so
- * clicking it never fails with "command not found".
- */
-const PLANNED_COMMANDS = [
-	'cleanPush.openFirstLeftover',
-	'cleanPush.fixAllInFile',
-	'cleanPush.refresh',
-	'cleanPush.changeScope',
-	'cleanPush.installHook',
-	'cleanPush.uninstallHook',
-] as const;
+import { Checker } from './checker';
+import { registerCommands } from './commands';
+import { getGitApi } from './git/gitApi';
+import { LeftoverStore } from './store';
+import { registerDiagnostics } from './ui/diagnostics';
 
 export function activate(context: vscode.ExtensionContext): void {
 	const log = vscode.window.createOutputChannel('Clean Push', { log: true });
-	context.subscriptions.push(log);
+	const store = new LeftoverStore();
+	let checker: Checker | undefined;
+	let ready: Promise<void> = Promise.resolve();
+
+	context.subscriptions.push(
+		log,
+		store,
+		registerDiagnostics(store),
+		registerCommands(async () => {
+			await ready;
+			await checker?.refresh();
+		}),
+		{ dispose: () => checker?.dispose() },
+	);
 	log.info(`Clean Push ${context.extension.packageJSON.version} activated`);
 
-	for (const id of PLANNED_COMMANDS) {
-		context.subscriptions.push(
-			vscode.commands.registerCommand(id, () => {
-				void vscode.window.showInformationMessage(`Clean Push: "${id}" is not implemented yet.`);
-			}),
-		);
-	}
+	// The Git API can take a while to be ready; don't hold up activation for it.
+	ready = getGitApi(log).then(
+		(api) => {
+			if (api) {
+				checker = new Checker(api, store, log);
+			}
+		},
+		(e) => log.error(`Could not get the Git extension's API: ${e instanceof Error ? e.message : e}`),
+	);
 }
 
 export function deactivate(): void {}

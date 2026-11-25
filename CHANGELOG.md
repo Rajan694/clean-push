@@ -7,6 +7,13 @@ Write new entries under **[Unreleased]**. The publish script moves them under th
 
 ## [Unreleased]
 
+### Added
+
+- Checks the lines you added for leftovers after every save and every Git change (commit, stage, checkout, pull), and shows them as squiggles, scrollbar marks and Problems panel entries (source `clean-push`); F8 steps through them.
+- Rules: `console` (console.log, .debug, .info, .trace, .dir, .table; .warn and .error are in the ignore list by default), `debugger` (JavaScript, Python, Ruby), `focused-test` (`.only(`, `fit(`, `fdescribe(` in test files), `conflict-marker` and `todo` (new TODO / FIXME / HACK / XXX comments). Comments and strings are skipped where that makes sense.
+- Settings: `cleanPush.scope` (`unpushed` falls back to `uncommitted` when the branch has no upstream), `cleanPush.rules`, `cleanPush.ignoreList`, `cleanPush.exclude`, `cleanPush.largeFileKB` and `cleanPush.ignoreComment` (`// leftover-ignore`).
+- Commands: **Clean Push: Refresh** and **Clean Push: Change Scope**.
+
 ## [0.1.0] - 2026-11-25
 
 - Project setup: TypeScript + esbuild build, tests, packaging and release scripts.
