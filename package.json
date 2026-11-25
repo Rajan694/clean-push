@@ -119,6 +119,28 @@
         }
       ]
     },
+    "colors": [
+      {
+        "id": "cleanPush.errorLineBackground",
+        "description": "Background of lines with an error-level leftover.",
+        "defaults": {
+          "dark": "#f1484818",
+          "light": "#e5140012",
+          "highContrast": null,
+          "highContrastLight": null
+        }
+      },
+      {
+        "id": "cleanPush.warningLineBackground",
+        "description": "Background of lines with a warning-level leftover.",
+        "defaults": {
+          "dark": "#cca70014",
+          "light": "#bf880014",
+          "highContrast": null,
+          "highContrastLight": null
+        }
+      }
+    ],
     "configuration": {
       "title": "Clean Push",
       "properties": {

@@ -115,8 +115,8 @@ function fileItem(node: FileNode): vscode.TreeItem {
 	item.iconPath = vscode.ThemeIcon.File;
 	item.description = folder === '.' ? `${node.leftovers.length}` : `${node.leftovers.length} · ${folder}`;
 	item.tooltip = `${fileSummary(name, node.leftovers.map((l) => l.label))}\n${node.relativePath}`;
-	// 'leftoverFile.fixable' (shows the Fix all button) arrives with quick fixes in v0.3.
-	item.contextValue = 'leftoverFile';
+	// "fixable" shows the Fix all button.
+	item.contextValue = node.leftovers.some((l) => l.fix) ? 'leftoverFile.fixable' : 'leftoverFile';
 	return item;
 }
 

@@ -1,9 +1,13 @@
 import * as vscode from 'vscode';
 import { Checker } from './checker';
+import { LeftoverCodeActions } from './codeActions';
+import { SECTION } from './config';
 import { registerCommands } from './commands';
 import { getGitApi } from './git/gitApi';
 import { LeftoverStore } from './store';
 import { registerDiagnostics } from './ui/diagnostics';
+import { registerEditorDecorations } from './ui/editorDecorations';
+import { registerFileDecorations } from './ui/fileDecorations';
 import { LeftoversView } from './ui/leftoversView';
 import { registerStatusBar } from './ui/statusBar';
 
@@ -26,6 +30,15 @@ export function activate(context: vscode.ExtensionContext): TestApi {
 		registerDiagnostics(store),
 		leftoversView,
 		registerStatusBar(store),
+		registerEditorDecorations(store, context.extensionUri),
+		registerFileDecorations(store),
+		vscode.languages.registerCodeActionsProvider(
+			{ scheme: 'file' },
+			new LeftoverCodeActions(store, (uri) =>
+				vscode.workspace.getConfiguration(SECTION, uri).get<string>('ignoreComment', 'leftover-ignore').trim(),
+			),
+			LeftoverCodeActions.metadata,
+		),
 		registerCommands(store, async () => {
 			await ready;
 			await checker?.refresh();

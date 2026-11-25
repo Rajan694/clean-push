@@ -124,7 +124,7 @@ suite('Clean Push', () => {
 			assert.strictEqual(fileItem.label, 'feature.test.js');
 			assert.strictEqual(fileItem.description, '2 · src');
 			assert.strictEqual(fileItem.tooltip, 'feature.test.js — 2 leftovers: 1 focused test, 1 debugger\nsrc/feature.test.js');
-			assert.strictEqual(fileItem.contextValue, 'leftoverFile');
+			assert.strictEqual(fileItem.contextValue, 'leftoverFile.fixable');
 
 			const rows = (view.getChildren(file) as LeftoverNode[]).map((node) => view.getTreeItem(node));
 			assert.deepStrictEqual(
@@ -140,6 +140,41 @@ suite('Clean Push', () => {
 			const editor = vscode.window.activeTextEditor;
 			assert.strictEqual(editor?.document.uri.fsPath, file.uri.fsPath);
 			assert.ok(editor.selection.isEqual(new vscode.Selection(0, 0, 0, 7)), JSON.stringify(editor.selection));
+		});
+
+		test('lightbulb: remove the leftover, or ignore the line', async () => {
+			const file = path.join(dir, 'src', 'quick.ts');
+			fs.writeFileSync(file, 'export function f() {\n  console.log("x");\n}\n');
+			await vscode.commands.executeCommand('cleanPush.refresh');
+			const uri = vscode.Uri.file(file);
+			const [diagnostic] = await waitFor(() => leftoverDiagnostics(uri), (d) => d.length > 0);
+			assert.ok(diagnostic);
+
+			const doc = await vscode.workspace.openTextDocument(uri);
+			const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+				'vscode.executeCodeActionProvider',
+				uri,
+				diagnostic.range,
+				vscode.CodeActionKind.QuickFix.value,
+			);
+			// Actions from other extensions (e.g. Copilot) may follow; ours come first, in this order.
+			const ours = actions.slice(0, 2);
+			assert.deepStrictEqual(ours.map((a) => a.title), ['Remove console.log', 'Ignore this line (// leftover-ignore)']);
+
+			assert.ok(await vscode.workspace.applyEdit(ours[1].edit!));
+			assert.strictEqual(doc.getText(), 'export function f() {\n  console.log("x"); // leftover-ignore\n}\n');
+			await vscode.commands.executeCommand('undo');
+			assert.ok(await vscode.workspace.applyEdit(ours[0].edit!));
+			assert.strictEqual(doc.getText(), 'export function f() {\n}\n');
+			await doc.save();
+			assert.deepStrictEqual(await waitFor(() => leftoverDiagnostics(uri), (d) => d.length === 0), []);
+		});
+
+		test('Fix all removes every fixable leftover in a file and saves it', async () => {
+			const file = path.join(dir, 'src', 'feature.test.js');
+			await vscode.commands.executeCommand('cleanPush.fixAllInFile', vscode.Uri.file(file));
+			assert.strictEqual(fs.readFileSync(file, 'utf8'), 'it("works", () => {\n});\n');
+			assert.deepStrictEqual(await waitFor(() => leftoverDiagnostics(vscode.Uri.file(file)), (d) => d.length === 0), []);
 		});
 	});
 });

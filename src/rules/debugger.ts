@@ -30,14 +30,17 @@ export const debuggerRule: Rule = {
 	fix: 'removeLine',
 	check(line: LineView): RuleMatch[] {
 		const patterns = PATTERNS[line.languageId] ?? PATTERNS.js;
+		const matches: RuleMatch[] = [];
 		for (const { regex, label } of patterns) {
 			const m = regex.exec(line.code);
 			if (m) {
-				const lead = m[0].length - m[0].trimStart().length;
-				const start = m.index + lead;
-				return [{ start, end: m.index + m[0].trimEnd().length, message: `${label} left in code`, label: label === 'debugger statement' ? 'debugger' : label }];
+				const start = m.index + (m[0].length - m[0].trimStart().length);
+				const end = m.index + m[0].trimEnd().length;
+				if (!matches.some((x) => start < x.end && x.start < end)) {
+					matches.push({ start, end, message: `${label} left in code`, label: label === 'debugger statement' ? 'debugger' : label });
+				}
 			}
 		}
-		return [];
+		return matches.sort((a, b) => a.start - b.start);
 	},
 };
