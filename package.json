@@ -4,7 +4,7 @@
   "description": "Finds debug leftovers in the lines you changed (console.log, debugger, .only in tests, new TODOs, secrets, merge-conflict markers) and shows them in Source Control before you push.",
   "icon": "assets/icon.png",
   "publisher": "rajan694",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "repository": {
     "type": "git",
