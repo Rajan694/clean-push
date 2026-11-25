@@ -38,6 +38,17 @@ export class LeftoverStore implements vscode.Disposable {
 		return this.byRepo.size;
 	}
 
+	/** Root of the repository whose results include this file. */
+	rootOf(uri: vscode.Uri): string | undefined {
+		const key = uri.toString();
+		for (const [root, files] of this.byRepo) {
+			if (files.has(key)) {
+				return root;
+			}
+		}
+		return undefined;
+	}
+
 	get(uri: vscode.Uri): Leftover[] {
 		const key = uri.toString();
 		for (const files of this.byRepo.values()) {

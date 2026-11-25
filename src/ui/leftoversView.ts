@@ -116,7 +116,7 @@ function fileItem(node: FileNode): vscode.TreeItem {
 	item.description = folder === '.' ? `${node.leftovers.length}` : `${node.leftovers.length} · ${folder}`;
 	item.tooltip = `${fileSummary(name, node.leftovers.map((l) => l.label))}\n${node.relativePath}`;
 	// "fixable" shows the Fix all button.
-	item.contextValue = node.leftovers.some((l) => l.fix) ? 'leftoverFile.fixable' : 'leftoverFile';
+	item.contextValue = node.leftovers.some((l) => l.fix === 'removeLine' || l.fix === 'removeMatch') ? 'leftoverFile.fixable' : 'leftoverFile';
 	return item;
 }
 
@@ -130,10 +130,10 @@ function leftoverItem(leftover: Leftover): vscode.TreeItem {
 	const prefix = `${line + 1}  `;
 	const from = Math.min(snippet.length, Math.max(0, leftover.range.start.character - lead));
 	const to = Math.min(snippet.length, Math.max(from, leftover.range.end.character - lead));
-	const label: vscode.TreeItemLabel = {
-		label: prefix + snippet,
-		highlights: to > from ? [[prefix.length + from, prefix.length + to]] : [],
-	};
+	// File-level leftovers (env-file, large-file) have no line to show: use the message.
+	const label: vscode.TreeItemLabel = leftover.lineText
+		? { label: prefix + snippet, highlights: to > from ? [[prefix.length + from, prefix.length + to]] : [] }
+		: { label: leftover.message };
 
 	const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
 	item.id = `${leftover.uri.toString()}#${line}:${leftover.range.start.character}:${leftover.ruleId}`;
@@ -141,7 +141,8 @@ function leftoverItem(leftover: Leftover): vscode.TreeItem {
 	const [icon, color] = SEVERITY_ICON[leftover.severity];
 	item.iconPath = new vscode.ThemeIcon(icon, new vscode.ThemeColor(color));
 	item.tooltip = `${leftover.message}\nLine ${line + 1} · rule ${leftover.ruleId} (${leftover.severity})`;
-	item.contextValue = 'leftover';
+	// "gitignore" shows the Add to .gitignore item in the row's context menu.
+	item.contextValue = leftover.fix === 'addToGitignore' ? 'leftover.gitignore' : 'leftover';
 	item.command = {
 		command: 'vscode.open',
 		title: 'Open at Leftover',

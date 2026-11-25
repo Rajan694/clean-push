@@ -19,6 +19,12 @@ Write new entries under **[Unreleased]**. The publish script moves them under th
 - **Fix All Leftovers in File** button on Leftovers rows that have something to fix. It saves the file afterwards if it had no unsaved changes.
 - Gutter icon and a faint line background on lines with leftovers (colors `cleanPush.errorLineBackground` and `cleanPush.warningLineBackground` can be themed).
 - Files with leftovers are colored in the Explorer and editor tabs, with a count badge (`cleanPush.decorateExplorer`).
+- Rule `secret` (error): AWS access keys, GitHub, Slack, Stripe live, Google, OpenAI and Anthropic tokens, private key headers, and hard-coded values for names such as `apiKey`, `password` or `client_secret` (quoted in code, also unquoted in `.env`, YAML, INI, TOML and shell files). Placeholders such as `"your-key-here"`, `"${VAR}"` or `"xxxx"` are not flagged.
+- Rule `print` (warning): `print(` / `pprint(` in Python, `System.out.println` / `printf`, `fmt.Println` and Go's `println`, Rust's `dbg!`, PHP's `var_dump`, `print_r` and `dd(`; removable with the same quick fix as `console`.
+- Rule `env-file` (error): a changed `.env` file that git doesn't ignore (`.env.example`, `.env.sample` and similar are fine).
+- Rule `large-file` (warning): an added file bigger than `cleanPush.largeFileKB`, binary files included.
+- **Add to .gitignore** quick fix and Leftovers-row menu item for `env-file` and `large-file`; if git already tracks the file it offers to stop tracking it (`git rm --cached`).
+- `cleanPush.customRules`: your own regex rules, with languages, severity and message.
 
 ## [0.1.0] - 2026-11-25
 

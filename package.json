@@ -73,6 +73,11 @@
         "icon": "$(filter)"
       },
       {
+        "command": "cleanPush.addToGitignore",
+        "title": "Add to .gitignore",
+        "category": "Clean Push"
+      },
+      {
         "command": "cleanPush.installHook",
         "title": "Install Git Pre-push Hook",
         "category": "Clean Push"
@@ -91,6 +96,10 @@
         },
         {
           "command": "cleanPush.fixAllInFile",
+          "when": "false"
+        },
+        {
+          "command": "cleanPush.addToGitignore",
           "when": "false"
         }
       ],
@@ -116,6 +125,10 @@
           "command": "cleanPush.fixAllInFile",
           "when": "view == cleanPush.leftovers && viewItem == leftoverFile.fixable",
           "group": "inline"
+        },
+        {
+          "command": "cleanPush.addToGitignore",
+          "when": "view == cleanPush.leftovers && viewItem == leftover.gitignore"
         }
       ]
     },

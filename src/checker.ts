@@ -5,7 +5,7 @@ import type { API, Repository } from './git/git';
 import { gitRunner, listChangedFiles, type ChangedFile, type Scope } from './git/changedFiles';
 import type { Finding, Leftover } from './model';
 import { languageFromPath } from './languages';
-import { scanText } from './scanner';
+import { scanFileInfo, scanText } from './scanner';
 import { readSettings, SECTION, type Settings } from './config';
 import type { LeftoverStore } from './store';
 
@@ -210,21 +210,32 @@ export class Checker implements vscode.Disposable {
 		} catch {
 			return undefined; // deleted since git listed it
 		}
-		if (!stat.isFile() || stat.size > settings.maxFileBytes) {
+		if (!stat.isFile()) {
 			return undefined;
 		}
 		const languageId = openLanguageId ?? languageFromPath(file.relativePath);
-		const key = [stat.mtimeMs, stat.size, languageId, JSON.stringify(file.addedLines)].join('|');
+		const key = [stat.mtimeMs, stat.size, languageId, file.isNew, JSON.stringify(file.addedLines)].join('|');
 		const cached = state.cache.get(absolute);
 		if (cached && cached.key === key) {
 			return cached;
 		}
 
-		const bytes = await fs.promises.readFile(absolute);
-		if (bytes.subarray(0, 8000).includes(0)) {
-			return { key, findings: [] }; // binary
+		// File rules (env-file, large-file) first: they also apply to files too big to read.
+		const findings = scanFileInfo(
+			{ path: file.relativePath, sizeBytes: stat.size, isNew: file.isNew, largeFileBytes: settings.maxFileBytes },
+			settings.fileRules,
+		);
+		if (stat.size > settings.maxFileBytes || (file.addedLines !== 'all' && file.addedLines.length === 0 && findings.length === 0)) {
+			return { key, findings };
 		}
-		const findings = scanText(bytes.toString('utf8'), file.relativePath, languageId, file.addedLines, settings);
+		const bytes = await fs.promises.readFile(absolute);
+		if (!bytes.subarray(0, 8000).includes(0)) {
+			const text = bytes.toString('utf8');
+			// Underline the whole first line for file-level findings, so the lightbulb shows there.
+			const firstLine = /^[^\r\n]*/.exec(text)![0].length;
+			findings.forEach((f) => (f.end = firstLine));
+			findings.push(...scanText(text, file.relativePath, languageId, file.addedLines, settings));
+		}
 		return { key, findings };
 	}
 

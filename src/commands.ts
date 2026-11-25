@@ -1,6 +1,7 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
 import { SECTION } from './config';
-import type { Scope } from './git/changedFiles';
+import { gitRunner, type Scope } from './git/changedFiles';
 import type { LeftoverStore } from './store';
 import { fixAllEdit } from './codeActions';
 import { plural } from './summary';
@@ -17,18 +18,25 @@ const SCOPE_ITEMS: readonly { scope: Scope; label: string; detail: string }[] = 
 	{ scope: 'staged', label: 'Staged', detail: 'Staged changes only.' },
 ];
 
-export function registerCommands(store: LeftoverStore, refresh: () => Promise<void>): vscode.Disposable {
+export interface CommandDeps {
+	store: LeftoverStore;
+	refresh: () => Promise<void>;
+	/** Path of the git executable, once the Git extension is ready. */
+	gitPath: () => string | undefined;
+}
+
+/** A file a command is for: a view row, a URI, or (when undefined) the active editor's file. */
+type Target = { uri: vscode.Uri } | { leftover: { uri: vscode.Uri } } | vscode.Uri | undefined;
+
+export function registerCommands({ store, refresh, gitPath }: CommandDeps): vscode.Disposable {
 	const disposables = [
 		vscode.commands.registerCommand('cleanPush.refresh', () =>
 			vscode.window.withProgress({ location: { viewId: 'workbench.scm' } }, refresh),
 		),
 		vscode.commands.registerCommand('cleanPush.changeScope', changeScope),
-		vscode.commands.registerCommand('cleanPush.openFirstLeftover', (target?: { uri: vscode.Uri } | vscode.Uri) =>
-			openFirstLeftover(store, target),
-		),
-		vscode.commands.registerCommand('cleanPush.fixAllInFile', (target?: { uri: vscode.Uri } | vscode.Uri) =>
-			fixAllInFile(store, target),
-		),
+		vscode.commands.registerCommand('cleanPush.openFirstLeftover', (target?: Target) => openFirstLeftover(store, target)),
+		vscode.commands.registerCommand('cleanPush.fixAllInFile', (target?: Target) => fixAllInFile(store, target)),
+		vscode.commands.registerCommand('cleanPush.addToGitignore', (target?: Target) => addToGitignore(store, gitPath(), target)),
 	];
 	for (const [id, milestone] of Object.entries(PLANNED)) {
 		disposables.push(
@@ -44,7 +52,7 @@ export function registerCommands(store: LeftoverStore, refresh: () => Promise<vo
  * The Jump button on a file row: opens the file with its first leftover selected. Takes the
  * row, a file URI, or nothing (the active editor's file).
  */
-async function openFirstLeftover(store: LeftoverStore, target?: { uri: vscode.Uri } | vscode.Uri): Promise<void> {
+async function openFirstLeftover(store: LeftoverStore, target?: Target): Promise<void> {
 	const uri = targetUri(target);
 	if (!uri) {
 		return;
@@ -57,16 +65,79 @@ async function openFirstLeftover(store: LeftoverStore, target?: { uri: vscode.Ur
 	await vscode.window.showTextDocument(uri, { selection: first.range });
 }
 
-/** The file a command is for: a view row, a URI, or else the active editor's file. */
-function targetUri(target?: { uri: vscode.Uri } | vscode.Uri): vscode.Uri | undefined {
-	return target instanceof vscode.Uri ? target : (target?.uri ?? vscode.window.activeTextEditor?.document.uri);
+function targetUri(target: Target): vscode.Uri | undefined {
+	if (target instanceof vscode.Uri) {
+		return target;
+	}
+	if (target && 'leftover' in target) {
+		return target.leftover.uri;
+	}
+	return target?.uri ?? vscode.window.activeTextEditor?.document.uri;
+}
+
+/** Line for .gitignore that matches exactly this file: rooted, with special characters escaped. */
+export function gitignoreEntry(relativePath: string): string {
+	return '/' + relativePath.replace(/[\\*?[\]!#]/g, '\\$&').replace(/ $/, '\\ ');
+}
+
+/**
+ * Adds the file to the repository's .gitignore (for env-file and large-file). If git already
+ * tracks it, offers to stop tracking it, since .gitignore alone won't keep it out of commits.
+ */
+async function addToGitignore(store: LeftoverStore, git: string | undefined, target: Target): Promise<void> {
+	const uri = targetUri(target);
+	const root = uri && store.rootOf(uri);
+	if (!uri || !root) {
+		void vscode.window.showWarningMessage('Clean Push: this file is not in a repository Clean Push is checking.');
+		return;
+	}
+	const relative = path.relative(root, uri.fsPath).split(path.sep).join('/');
+	const entry = gitignoreEntry(relative);
+	const gitignore = vscode.Uri.file(path.join(root, '.gitignore'));
+
+	let existing: vscode.TextDocument | undefined;
+	try {
+		existing = await vscode.workspace.openTextDocument(gitignore);
+	} catch {
+		existing = undefined;
+	}
+	if (!existing) {
+		await vscode.workspace.fs.writeFile(gitignore, Buffer.from(`${entry}\n`, 'utf8'));
+	} else if (!existing.getText().split(/\r?\n/).includes(entry)) {
+		const wasDirty = existing.isDirty;
+		const text = existing.getText();
+		const eol = existing.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
+		const edit = new vscode.WorkspaceEdit();
+		edit.insert(gitignore, existing.positionAt(text.length), (text === '' || text.endsWith('\n') ? '' : eol) + entry + eol);
+		await vscode.workspace.applyEdit(edit);
+		if (!wasDirty) {
+			await existing.save();
+		}
+	}
+
+	const run = git ? gitRunner(git, root) : undefined;
+	const tracked = run ? await run(['ls-files', '--error-unmatch', '--', relative]).then(() => true, () => false) : false;
+	if (!tracked) {
+		void vscode.window.showInformationMessage(`Clean Push: added ${entry} to .gitignore.`);
+		return;
+	}
+	const stop = 'Stop Tracking';
+	const choice = await vscode.window.showWarningMessage(
+		`Clean Push: added ${entry} to .gitignore, but git already tracks ${relative}, so it would still be pushed. ` +
+			'Stop tracking it? (git rm --cached: the file stays on disk)',
+		stop,
+	);
+	if (choice === stop && run) {
+		await run(['rm', '--cached', '--quiet', '--', relative]);
+		void vscode.window.showInformationMessage(`Clean Push: ${relative} is no longer tracked. Commit the change to keep it out.`);
+	}
 }
 
 /**
  * Fix all: removes every leftover in the file that has a safe fix. A file that had no unsaved
  * changes is saved afterwards, so it is checked again straight away.
  */
-async function fixAllInFile(store: LeftoverStore, target?: { uri: vscode.Uri } | vscode.Uri): Promise<void> {
+async function fixAllInFile(store: LeftoverStore, target?: Target): Promise<void> {
 	const uri = targetUri(target);
 	const leftovers = uri ? store.get(uri) : [];
 	if (!uri || leftovers.length === 0) {

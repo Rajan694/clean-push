@@ -4,7 +4,7 @@
 
 **Catch debug leftovers before you push.** Clean Push checks only the lines you changed for `console.log`, `debugger`, `.only` in tests, new TODOs, secrets and merge-conflict markers, and lists them in a **Leftovers** section right under Git's Changes list in Source Control.
 
-> **Status: early development.** Milestones 0.1 to 0.3 work: leftovers in the lines you changed show up in the editor, the Problems panel, a Leftovers section under Git's Changes list, the Explorer and the status bar, with quick fixes to remove them. The safety rules and the git hook arrive by milestone (see [Roadmap](#roadmap)). The full design is in [docs/DESIGN.md](docs/DESIGN.md).
+> **Status: early development.** Milestones 0.1 to 0.4 work: every rule below is checked in the lines you changed, and leftovers show up in the editor, the Problems panel, a Leftovers section under Git's Changes list, the Explorer and the status bar, with quick fixes to remove them. The optional git hook arrives in 1.0 (see [Roadmap](#roadmap)). The full design is in [docs/DESIGN.md](docs/DESIGN.md).
 
 ## Features
 
@@ -20,12 +20,12 @@
 | Rule | Catches | Default |
 | --- | --- | --- |
 | `conflict-marker` | `<<<<<<<`, `=======`, `>>>>>>>` | Error |
-| `secret` | AWS keys, GitHub tokens, private key headers, `api_key = "…"` | Error |
+| `secret` | AWS keys, GitHub / Slack / Stripe / Google / OpenAI / Anthropic tokens, private key headers, `api_key = "…"` (placeholders like `"your-key-here"` don't count) | Error |
 | `env-file` | A changed `.env` file that git doesn't ignore | Error |
 | `focused-test` | `.only(`, `fit(`, `fdescribe(` | Error |
 | `debugger` | `debugger;`, `breakpoint()`, `pdb.set_trace()`, `binding.pry` | Warning |
 | `console` | `console.log` / `.debug` / `.info` / `.trace` (not `console.warn` / `console.error` by default) | Warning |
-| `print` | `print(`, `System.out.println`, `fmt.Println`, `dbg!`, `var_dump`, `dd(` | Warning |
+| `print` | `print(` in Python, `System.out.println`, `fmt.Println`, `dbg!`, `var_dump`, `print_r`, `dd(` | Warning |
 | `large-file` | An added file over 1 MB | Warning |
 | `todo` | New `TODO`, `FIXME`, `HACK`, `XXX` | Info |
 
@@ -49,7 +49,7 @@
 | 0.1 ✓ | Warnings in the editor: added-line detection, `console`, `debugger`, `focused-test`, `conflict-marker`, `todo` (also the `scope`, `ignoreList`, `exclude`, `largeFileKB` and `ignoreComment` settings) |
 | 0.2 ✓ | Leftovers section in Source Control, status bar item |
 | 0.3 ✓ | Quick fixes, Fix all, Explorer and tab badges, `leftover-ignore` |
-| 0.4 | `secret`, `env-file`, `large-file`, `print`, custom rules, scope setting |
+| 0.4 ✓ | `secret`, `env-file`, `large-file`, `print`, custom rules, scope setting |
 | 1.0 | Optional pre-push git hook, cross-platform tests, Marketplace listing |
 
 ## Requirements
@@ -73,7 +73,7 @@ npm test            # extension tests in a downloaded VS Code
 The rule engine (`src/scanner.ts`, `src/lexer.ts`, `src/rules/`, `src/summary.ts`, `src/fixes.ts`, `src/git/addedLines.ts`, `src/git/changedFiles.ts`) has no VS Code imports, so its tests also run in plain mocha, in well under a second:
 
 ```bash
-npm run compile-tests && npx mocha --ui tdd out/test/rules.test.js out/test/addedLines.test.js out/test/changedFiles.test.js out/test/summary.test.js out/test/fixes.test.js
+npm run compile-tests && npx mocha --ui tdd out/test/rules.test.js out/test/addedLines.test.js out/test/changedFiles.test.js out/test/summary.test.js out/test/fixes.test.js out/test/safetyRules.test.js
 ```
 
 Press `F5` in VS Code to open a window with the extension loaded. Packaging and publishing are described in [RELEASING.md](RELEASING.md).

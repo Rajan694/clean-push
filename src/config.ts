@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
-import type { ActiveRule, SeveritySetting } from './model';
+import type { ActiveFileRule, ActiveRule, SeveritySetting } from './model';
 import type { Scope } from './git/changedFiles';
-import { activeRules } from './rules';
+import { activeFileRules, activeRules } from './rules';
+import { customRules } from './rules/custom';
 import { excludeMatcher, ignoreMatcher, type IgnoreMatcher } from './match';
 
 export const SECTION = 'cleanPush';
@@ -10,6 +11,7 @@ export const SECTION = 'cleanPush';
 export interface Settings {
 	scope: Scope;
 	rules: ActiveRule[];
+	fileRules: ActiveFileRule[];
 	ignore: IgnoreMatcher;
 	ignoreComment: string;
 	isExcluded: (relativePath: string) => boolean;
@@ -22,9 +24,14 @@ export function readSettings(resource: vscode.Uri | undefined, log: vscode.LogOu
 	const config = vscode.workspace.getConfiguration(SECTION, resource);
 	const scope = config.get<string>('scope', 'unpushed');
 	const largeFileKB = config.get<number>('largeFileKB', 1024);
+	const severities = config.get<Record<string, SeveritySetting>>('rules', {});
 	return {
 		scope: SCOPES.includes(scope as Scope) ? (scope as Scope) : 'unpushed',
-		rules: activeRules(config.get<Record<string, SeveritySetting>>('rules', {})),
+		rules: [
+			...activeRules(severities),
+			...customRules(config.get<unknown[]>('customRules', []), (problem) => log.warn(`cleanPush.customRules: ${problem}`)),
+		],
+		fileRules: activeFileRules(severities),
 		ignore: ignoreMatcher(config.get<string[]>('ignoreList', []), (entry, error) =>
 			log.warn(`cleanPush.ignoreList: skipping invalid regex ${entry}: ${error}`),
 		),

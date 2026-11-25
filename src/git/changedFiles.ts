@@ -13,6 +13,8 @@ export interface ChangedFile {
 	/** Path relative to the repository root, with `/` separators. */
 	relativePath: string;
 	addedLines: AddedLines;
+	/** New in the scope (added or untracked), not just changed. */
+	isNew: boolean;
 }
 
 export interface ChangeSet {
@@ -78,17 +80,19 @@ export async function listChangedFiles(git: Git, scope: Scope): Promise<ChangeSe
 	const headExists = await hasHead(git);
 
 	if (scope === 'staged') {
-		const [staged, unstaged] = await Promise.all([
+		const [staged, unstaged, added] = await Promise.all([
 			git(diffArgs('--cached')).then(parseUnifiedDiff),
 			git(diffArgs()).then(parseUnifiedDiff),
+			addedPaths(git, '--cached'),
 		]);
 		const files: ChangedFile[] = [];
 		for (const [relativePath, hunks] of staged) {
 			const lines = mapThroughHunks(addedRanges(hunks), unstaged.get(relativePath) ?? []);
-			if (lines.length > 0) {
-				files.push({ relativePath, addedLines: lines });
+			if (lines.length > 0 || added.has(relativePath)) {
+				files.push({ relativePath, addedLines: lines, isNew: added.has(relativePath) });
 			}
 		}
+		addMissing(files, added);
 		return { files, scope };
 	}
 
@@ -98,7 +102,7 @@ export async function listChangedFiles(git: Git, scope: Scope): Promise<ChangeSe
 		// No commits yet: every tracked and untracked file is new.
 		const tracked = await lsFiles(git);
 		const all = [...new Set([...tracked, ...untracked])];
-		return { files: all.map((relativePath) => ({ relativePath, addedLines: 'all' })), scope };
+		return { files: all.map((relativePath) => ({ relativePath, addedLines: 'all', isNew: true })), scope };
 	}
 
 	let base = 'HEAD';
@@ -112,15 +116,33 @@ export async function listChangedFiles(git: Git, scope: Scope): Promise<ChangeSe
 		}
 	}
 
+	const [patch, added] = await Promise.all([git(diffArgs(base)).then(parseUnifiedDiff), addedPaths(git, base)]);
 	const files: ChangedFile[] = [];
-	for (const [relativePath, hunks] of parseUnifiedDiff(await git(diffArgs(base)))) {
+	for (const [relativePath, hunks] of patch) {
 		const lines = addedRanges(hunks);
-		if (lines.length > 0) {
-			files.push({ relativePath, addedLines: lines });
+		if (lines.length > 0 || added.has(relativePath)) {
+			files.push({ relativePath, addedLines: lines, isNew: added.has(relativePath) });
 		}
 	}
+	addMissing(files, added);
 	for (const relativePath of untracked) {
-		files.push({ relativePath, addedLines: 'all' });
+		files.push({ relativePath, addedLines: 'all', isNew: true });
 	}
 	return { files, scope: used };
+}
+
+/** Files the diff adds (not renames), including binary and empty files that have no hunks. */
+async function addedPaths(git: Git, ...against: string[]): Promise<Set<string>> {
+	const out = await git(['diff', '--name-only', '-z', '--no-ext-diff', '-M', '--diff-filter=A', '--ignore-submodules=all', ...against, '--']);
+	return new Set(out.split('\0').filter(Boolean));
+}
+
+/** Adds added files the patch had no lines for (binary or empty), so file rules still see them. */
+function addMissing(files: ChangedFile[], added: Set<string>): void {
+	const listed = new Set(files.map((f) => f.relativePath));
+	for (const relativePath of added) {
+		if (!listed.has(relativePath)) {
+			files.push({ relativePath, addedLines: [], isNew: true });
+		}
+	}
 }

@@ -22,6 +22,7 @@ export function activate(context: vscode.ExtensionContext): TestApi {
 	const store = new LeftoverStore();
 	const leftoversView = new LeftoversView(store);
 	let checker: Checker | undefined;
+	let gitPath: string | undefined;
 	let ready: Promise<void> = Promise.resolve();
 
 	context.subscriptions.push(
@@ -39,9 +40,13 @@ export function activate(context: vscode.ExtensionContext): TestApi {
 			),
 			LeftoverCodeActions.metadata,
 		),
-		registerCommands(store, async () => {
-			await ready;
-			await checker?.refresh();
+		registerCommands({
+			store,
+			refresh: async () => {
+				await ready;
+				await checker?.refresh();
+			},
+			gitPath: () => gitPath,
 		}),
 		{ dispose: () => checker?.dispose() },
 	);
@@ -51,6 +56,7 @@ export function activate(context: vscode.ExtensionContext): TestApi {
 	ready = getGitApi(log).then(
 		(api) => {
 			if (api) {
+				gitPath = api.git.path;
 				checker = new Checker(api, store, log);
 			}
 		},

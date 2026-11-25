@@ -1,5 +1,5 @@
 // Runs the rules over the added lines of one file. No VS Code imports.
-import type { ActiveRule, AddedLines, Finding, LineView } from './model';
+import type { ActiveFileRule, ActiveRule, AddedLines, FileInfo, Finding, LineView } from './model';
 import { syntaxFor } from './languages';
 import { lexLines } from './lexer';
 import { hasIgnoreComment, type IgnoreMatcher } from './match';
@@ -65,6 +65,18 @@ export function scanText(text: string, path: string, languageId: string, added: 
 			for (let n = range.start; n <= Math.min(range.end, lines.length - 1); n++) {
 				visit(n);
 			}
+		}
+	}
+	return findings;
+}
+
+/** Findings of the file-level rules (env-file, large-file), reported on the first line. */
+export function scanFileInfo(file: FileInfo, rules: readonly ActiveFileRule[]): Finding[] {
+	const findings: Finding[] = [];
+	for (const rule of rules) {
+		const hit = rule.check(file);
+		if (hit) {
+			findings.push({ line: 0, start: 0, end: 0, ruleId: rule.id, severity: rule.severity, message: hit.message, label: hit.label, text: '', fix: rule.fix });
 		}
 	}
 	return findings;

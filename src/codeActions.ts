@@ -106,7 +106,7 @@ export class LeftoverCodeActions implements vscode.CodeActionProvider {
 				(l) => l.ruleId === diagnostic.code && l.range.isEqual(diagnostic.range),
 			);
 			const line = diagnostic.range.start.line;
-			if (!leftover || doc.lines[line] !== leftover.lineText) {
+			if (!leftover || (leftover.lineText !== '' && doc.lines[line] !== leftover.lineText)) {
 				continue; // the line changed since it was checked
 			}
 
@@ -121,6 +121,15 @@ export class LeftoverCodeActions implements vscode.CodeActionProvider {
 					action.isPreferred = true;
 					actions.push(action);
 				}
+			}
+
+			if (leftover.fix === 'addToGitignore') {
+				const action = new vscode.CodeAction('Add to .gitignore', vscode.CodeActionKind.QuickFix);
+				action.command = { command: 'cleanPush.addToGitignore', title: action.title, arguments: [document.uri] };
+				action.diagnostics = [diagnostic];
+				action.isPreferred = true;
+				actions.push(action);
+				continue; // ignoring a line doesn't help with a file-level leftover
 			}
 
 			if (leftover.ruleId !== 'conflict-marker' && !ignoredLines.has(line)) {
@@ -138,7 +147,7 @@ export class LeftoverCodeActions implements vscode.CodeActionProvider {
 			}
 		}
 
-		if (leftovers.filter((l) => l.fix).length > 1 && actions.length > 0) {
+		if (leftovers.filter((l) => l.fix === 'removeLine' || l.fix === 'removeMatch').length > 1 && actions.length > 0) {
 			const action = new vscode.CodeAction('Remove all leftovers in this file', vscode.CodeActionKind.QuickFix);
 			action.command = { command: 'cleanPush.fixAllInFile', title: action.title, arguments: [document.uri] };
 			actions.push(action);

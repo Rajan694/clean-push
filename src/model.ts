@@ -55,6 +55,29 @@ export interface ActiveRule extends Rule {
 	severity: Severity;
 }
 
+/** What file-level rules know about a changed file. */
+export interface FileInfo {
+	/** Repository-relative path with `/` separators. */
+	path: string;
+	sizeBytes: number;
+	/** Added in the scope (new or untracked), not just changed. */
+	isNew: boolean;
+	/** cleanPush.largeFileKB in bytes. */
+	largeFileBytes: number;
+}
+
+/** A rule about a whole file (its name or size) rather than its lines. */
+export interface FileRule {
+	id: string;
+	defaultSeverity: Severity;
+	check(file: FileInfo): { message: string; label: string } | undefined;
+	fix?: FixKind;
+}
+
+export interface ActiveFileRule extends FileRule {
+	severity: Severity;
+}
+
 /** A leftover found by the scanner, in plain line/character terms. */
 export interface Finding {
 	/** 0-based line number. */

@@ -22,6 +22,30 @@ async function waitFor<T>(read: () => T, done: (value: T) => boolean, timeoutMs 
 	}
 }
 
+/**
+ * Asks for the quick fixes at a range. VS Code cancels the request if the document changes
+ * meanwhile (a file watcher can catch up with a write just after the test opens the file),
+ * so try again a few times, as the editor itself would.
+ */
+async function quickFixes(uri: vscode.Uri, range: vscode.Range): Promise<vscode.CodeAction[]> {
+	await vscode.workspace.openTextDocument(uri); // code actions need an open document
+	for (let attempt = 1; ; attempt++) {
+		try {
+			return await vscode.commands.executeCommand<vscode.CodeAction[]>(
+				'vscode.executeCodeActionProvider',
+				uri,
+				range,
+				vscode.CodeActionKind.QuickFix.value,
+			);
+		} catch (e) {
+			if (attempt >= 5 || !(e instanceof Error) || e.message !== 'Canceled') {
+				throw e;
+			}
+			await new Promise((resolve) => setTimeout(resolve, 200));
+		}
+	}
+}
+
 function leftoverDiagnostics(uri: vscode.Uri): vscode.Diagnostic[] {
 	return vscode.languages.getDiagnostics(uri).filter((d) => d.source === 'clean-push');
 }
@@ -151,14 +175,9 @@ suite('Clean Push', () => {
 			assert.ok(diagnostic);
 
 			const doc = await vscode.workspace.openTextDocument(uri);
-			const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
-				'vscode.executeCodeActionProvider',
-				uri,
-				diagnostic.range,
-				vscode.CodeActionKind.QuickFix.value,
-			);
-			// Actions from other extensions (e.g. Copilot) may follow; ours come first, in this order.
-			const ours = actions.slice(0, 2);
+			const actions = await quickFixes(uri, diagnostic.range);
+			// Other extensions (e.g. Copilot) may add actions, in any order around ours.
+			const ours = actions.filter((a) => a.title === 'Remove console.log' || a.title.startsWith('Ignore this line'));
 			assert.deepStrictEqual(ours.map((a) => a.title), ['Remove console.log', 'Ignore this line (// leftover-ignore)']);
 
 			assert.ok(await vscode.workspace.applyEdit(ours[1].edit!));
@@ -175,6 +194,28 @@ suite('Clean Push', () => {
 			await vscode.commands.executeCommand('cleanPush.fixAllInFile', vscode.Uri.file(file));
 			assert.strictEqual(fs.readFileSync(file, 'utf8'), 'it("works", () => {\n});\n');
 			assert.deepStrictEqual(await waitFor(() => leftoverDiagnostics(vscode.Uri.file(file)), (d) => d.length === 0), []);
+		});
+
+		test('a new .env file: env-file and secret, fixed by Add to .gitignore', async () => {
+			const env = vscode.Uri.file(path.join(dir, '.env'));
+			fs.writeFileSync(env.fsPath, 'API_KEY=abcd1234efgh5678\n');
+			await vscode.commands.executeCommand('cleanPush.refresh');
+			const found = await waitFor(() => leftoverDiagnostics(env), (d) => d.length >= 2);
+			assert.deepStrictEqual(
+				found.map((d) => [d.code, d.severity, d.range.start.line]),
+				[
+					['env-file', vscode.DiagnosticSeverity.Error, 0],
+					['secret', vscode.DiagnosticSeverity.Error, 0],
+				],
+			);
+
+			const actions = await quickFixes(env, found[0].range);
+			assert.ok(actions.some((a) => a.title === 'Add to .gitignore'), actions.map((a) => a.title).join(', '));
+
+			await vscode.commands.executeCommand('cleanPush.addToGitignore', env);
+			assert.strictEqual(fs.readFileSync(path.join(dir, '.gitignore'), 'utf8'), '/.env\n');
+			await vscode.commands.executeCommand('cleanPush.refresh');
+			assert.deepStrictEqual(await waitFor(() => leftoverDiagnostics(env), (d) => d.length === 0), []);
 		});
 	});
 });

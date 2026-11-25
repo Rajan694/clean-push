@@ -93,6 +93,31 @@ suite('changedFiles (real git)', function () {
 		assert.deepStrictEqual(summary(await listChangedFiles(run, 'uncommitted')), { 'a.ts': [{ start: 3, end: 3 }] });
 	});
 
+	test('marks added files, including binary and empty ones', async () => {
+		const { dir, write, git, run } = repo();
+		write('old.ts', 'a\n');
+		git('add', '.');
+		git('commit', '-qm', 'init');
+		write('old.ts', 'a\nb\n');
+		fs.writeFileSync(path.join(dir, 'image.bin'), Buffer.from([0x89, 0x50, 0x00, 0x01, 0x02]));
+		write('empty.ts', '');
+		write('staged-new.ts', 'x\n');
+		git('add', 'image.bin', 'empty.ts', 'staged-new.ts');
+		write('untracked.ts', 'u\n');
+
+		const changes = await listChangedFiles(run, 'uncommitted');
+		const byPath = Object.fromEntries(changes.files.map((f) => [f.relativePath, [f.isNew, f.addedLines]]));
+		assert.deepStrictEqual(byPath, {
+			'old.ts': [false, [{ start: 1, end: 1 }]],
+			'staged-new.ts': [true, [{ start: 0, end: 0 }]],
+			'empty.ts': [true, []],
+			'image.bin': [true, []],
+			'untracked.ts': [true, 'all'],
+		});
+		const staged = await listChangedFiles(run, 'staged');
+		assert.deepStrictEqual(staged.files.map((f) => f.relativePath).sort(), ['empty.ts', 'image.bin', 'staged-new.ts']);
+	});
+
 	test('staged: index lines mapped to the working tree', async () => {
 		const { write, git, run } = repo();
 		write('a.ts', 'one\ntwo\n');
