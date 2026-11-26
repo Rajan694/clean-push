@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { gitRunner, listChangedFiles, type ChangeSet } from '../git/changedFiles';
+import { removeTempDir } from './tempDir';
 
 /** A throwaway repository; git runs with a fixed identity so commits work anywhere. */
 function makeRepo(): { dir: string; git: (...args: string[]) => string; write: (file: string, text: string) => void } {
@@ -30,7 +31,7 @@ suite('changedFiles (real git)', function () {
 	const dirs: string[] = [];
 	teardown(() => {
 		for (const dir of dirs.splice(0)) {
-			fs.rmSync(dir, { recursive: true, force: true });
+			removeTempDir(dir);
 		}
 	});
 	function repo() {

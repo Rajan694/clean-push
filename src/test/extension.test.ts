@@ -7,6 +7,7 @@ import * as vscode from 'vscode';
 import type { TestApi } from '../extension';
 import type { GitExtension } from '../git/git';
 import type { FileNode, LeftoverNode } from '../ui/leftoversView';
+import { removeTempDir } from './tempDir';
 
 const EXTENSION_ID = 'rajan694.clean-push';
 
@@ -92,9 +93,9 @@ suite('Clean Push', () => {
 		suiteTeardown(async () => {
 			await vscode.commands.executeCommand('workbench.action.closeAllEditors');
 			try {
-				fs.rmSync(dir, { recursive: true, force: true });
+				removeTempDir(dir);
 			} catch {
-				// Windows may still hold a handle; the OS cleans the temp folder eventually.
+				// The Git extension may still hold a handle on Windows; the OS cleans the temp folder eventually.
 			}
 		});
 

@@ -5,6 +5,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { gitRunner } from '../git/changedFiles';
 import { HOOK_MARKER, hookScript, hookSnippet, hookState, writeHook } from '../hook/hookFile';
+import { removeTempDir } from './tempDir';
 
 const IDENTITY = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false'];
 
@@ -36,7 +37,7 @@ suite('pre-push hook (real git)', function () {
 		commit('README.md', 'hello\n');
 		git('push', '-q', '-u', 'origin', 'main');
 	});
-	teardown(() => fs.rmSync(path.dirname(dir), { recursive: true, force: true }));
+	teardown(() => removeTempDir(path.dirname(dir)));
 
 	test('the script is marked as ours and the snippet has the same checks', () => {
 		const script = hookScript();
