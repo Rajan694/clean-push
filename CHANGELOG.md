@@ -7,6 +7,8 @@ Write new entries under **[Unreleased]**. The publish script moves them under th
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-26
+
 ### Added
 
 - Checks the lines you added for leftovers after every save and every Git change (commit, stage, checkout, pull), and shows them as squiggles, scrollbar marks and Problems panel entries (source `clean-push`); F8 steps through them.
