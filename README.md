@@ -4,6 +4,8 @@
 
 **Catch debug leftovers before you push.** Clean Push checks only the lines you changed for `console.log`, `debugger`, `.only` in tests, new TODOs, secrets and merge-conflict markers, and lists them in a **Leftovers** section right under Git's Changes list in Source Control.
 
+![The Leftovers section in Source Control, next to an editor with highlighted leftovers](docs/images/leftovers-in-source-control.png)
+
 ## Features
 
 - **Only your changes.** Checks the lines you added (unpushed commits, staged and unstaged changes), so old code written by others doesn't nag you. Comments and strings are skipped where that makes sense: a `"console.log"` in a string or a commented-out call isn't a leftover.
@@ -15,6 +17,32 @@
 - **Local only.** No network calls, no AI.
 
 Checks run when you save a file and whenever Git's state changes (commit, stage, checkout, pull).
+
+## See it in action
+
+### Remove a leftover with a quick fix
+
+Put the cursor on a leftover and press `Ctrl+.` (`Cmd+.` on macOS). The count in the Leftovers section and the status bar drops as soon as you save.
+
+![Removing a console.log with the quick fix](docs/images/quick-fix.gif)
+
+### Fix all leftovers in a file
+
+**Fix All Leftovers in File** (the wand on a file row) removes every leftover that can be removed safely. Secrets and TODOs stay for you to handle.
+
+![Fix All Leftovers in File removes console.log and debugger lines in one click](docs/images/fix-all-in-file.gif)
+
+### Hover for details
+
+![Hovering a leftover shows the rule and a Quick Fix link](docs/images/editor-hover.png)
+
+### Explorer, tabs, Problems and status bar
+
+![Files with leftovers are colored in the Explorer and tabs, listed in Problems, and counted in the status bar](docs/images/explorer-and-problems.png)
+
+### Block risky pushes with the pre-push hook
+
+![Installing the pre-push hook, then a git push blocked by a debugger statement and an it.only](docs/images/pre-push-hook.gif)
 
 ## Rules
 
@@ -90,25 +118,13 @@ The line background colors can be themed with `cleanPush.errorLineBackground` an
 
 ## Installation
 
-Install from the VS Code Marketplace or Open VSX, or from a `.vsix` file attached to a [GitHub release](https://github.com/Rajan694/clean-push/releases): see [INSTALL_FROM_VSIX.md](INSTALL_FROM_VSIX.md).
+Install from the VS Code Marketplace or Open VSX.
 
-## Development
-
-Requires Node.js 22 or later. The design is in [docs/DESIGN.md](docs/DESIGN.md).
+To install a specific version, download its `.vsix` file from the [GitHub releases](https://github.com/Rajan694/clean-push/releases), then in VS Code open the Extensions view, click `...` and choose **Install from VSIX...**, or run:
 
 ```bash
-npm install
-npm run compile     # type-check, lint, bundle to dist/
-npm test            # all tests, in a downloaded VS Code
+code --install-extension clean-push-X.Y.Z.vsix
 ```
-
-The rule engine, git layer, fixes and hook (everything outside `src/ui/`, `src/extension.ts`, `src/checker.ts`, `src/commands.ts`, `src/codeActions.ts` and `src/config.ts`) have no VS Code imports, so their tests also run in plain mocha, in about a second:
-
-```bash
-npm run compile-tests && npx mocha --ui tdd 'out/test/*.test.js' --exclude out/test/extension.test.js
-```
-
-Press `F5` in VS Code to open a window with the extension loaded. Packaging and publishing are described in [RELEASING.md](RELEASING.md).
 
 ## License
 
